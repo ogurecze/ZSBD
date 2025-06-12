@@ -1,0 +1,140 @@
+-- 1. Blok anonimowy: maksymalny numer departamentu i dodanie nowego departamentu
+DECLARE
+    numer_max departments.department_id%TYPE;
+    nazwa_nowego_departamentu departments.department_name%TYPE := 'EDUCATION';
+BEGIN
+    SELECT MAX(department_id) INTO numer_max FROM departments;
+    INSERT INTO departments (department_id, department_name, location_id)
+    VALUES (numer_max + 10, nazwa_nowego_departamentu, NULL);
+    DBMS_OUTPUT.PUT_LINE('Dodano nowy departament: ' || nazwa_nowego_departamentu);
+END;
+/
+
+-- 2. Aktualizacja location_id dla nowego departamentu
+DECLARE
+    numer_max departments.department_id%TYPE;
+BEGIN
+    SELECT MAX(department_id) INTO numer_max FROM departments;
+    UPDATE departments
+    SET location_id = 3000
+    WHERE department_id = numer_max;
+    DBMS_OUTPUT.PUT_LINE('Zaktualizowano location_id dla departamentu: ' || numer_max);
+END;
+/
+
+-- 3. Tworzenie tabeli i dodanie liczb od 1 do 10 bez 4 i 6
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE TABLE nowa (liczba VARCHAR2(10))';
+    FOR i IN 1..10 LOOP
+        IF i NOT IN (4, 6) THEN
+            INSERT INTO nowa (liczba) VALUES (TO_CHAR(i));
+        END IF;
+    END LOOP;
+END;
+/
+
+-- 4. Informacje z tabeli countries
+DECLARE
+    kraj countries%ROWTYPE;
+BEGIN
+    SELECT * INTO kraj FROM countries WHERE country_id = 'CA';
+    DBMS_OUTPUT.PUT_LINE('Nazwa kraju: ' || kraj.country_name || ', Region ID: ' || kraj.region_id);
+END;
+/
+
+-- 5. Zwiększenie min_salary o 5% dla Managerów i cofnięcie zmian
+DECLARE
+    rekord jobs%ROWTYPE;
+    licznik NUMBER := 0;
+BEGIN
+    FOR rekord IN (SELECT * FROM jobs WHERE job_title LIKE '%Manager%') LOOP
+        UPDATE jobs
+        SET min_salary = min_salary * 1.05
+        WHERE job_id = rekord.job_id;
+        licznik := licznik + 1;
+    END LOOP;
+    DBMS_OUTPUT.PUT_LINE('Zaktualizowano ' || licznik || ' rekordów.');
+
+    -- Cofnięcie zmian
+    ROLLBACK;
+    DBMS_OUTPUT.PUT_LINE('Cofnięto zmiany.');
+END;
+/
+
+-- 6. Informacje o stanowisku z najwyższą max_salary
+DECLARE
+    rekord jobs%ROWTYPE;
+BEGIN
+    SELECT * INTO rekord
+    FROM jobs
+    WHERE max_salary = (SELECT MAX(max_salary) FROM jobs);
+    DBMS_OUTPUT.PUT_LINE('Stanowisko: ' || rekord.job_title || ', Max Salary: ' || rekord.max_salary);
+END;
+/
+
+-- 7. Kursor dla region_id
+DECLARE
+    CURSOR region_cursor(region_id IN NUMBER) IS
+        SELECT c.country_name, COUNT(e.employee_id) AS liczba_pracownikow
+        FROM countries c
+        JOIN locations l ON c.country_id = l.country_id
+        JOIN departments d ON l.location_id = d.location_id
+        JOIN employees e ON d.department_id = e.department_id
+        WHERE c.region_id = region_id
+        GROUP BY c.country_name;
+BEGIN
+    FOR rekord IN region_cursor(1) LOOP
+        DBMS_OUTPUT.PUT_LINE('Kraj: ' || rekord.country_name || ', Liczba pracowników: ' || rekord.liczba_pracownikow);
+    END LOOP;
+END;
+/
+
+-- 8. Kursor dla departamentu 50
+DECLARE
+    CURSOR wynagrodzenie_cursor IS
+        SELECT salary, last_name
+        FROM employees
+        WHERE department_id = 50;
+BEGIN
+    FOR rekord IN wynagrodzenie_cursor LOOP
+        IF rekord.salary > 3100 THEN
+            DBMS_OUTPUT.PUT_LINE(rekord.last_name || ': nie dawać podwyżki');
+        ELSE
+            DBMS_OUTPUT.PUT_LINE(rekord.last_name || ': dać podwyżkę');
+        END IF;
+    END LOOP;
+END;
+/
+
+-- 9. Kursor z parametrami
+DECLARE
+    CURSOR zarobki_cursor(min_salary NUMBER, max_salary NUMBER, imie_frag CHAR) IS
+        SELECT salary, first_name, last_name
+        FROM employees
+        WHERE salary BETWEEN min_salary AND max_salary
+          AND LOWER(first_name) LIKE '%' || LOWER(imie_frag) || '%';
+BEGIN
+    FOR rekord IN zarobki_cursor(1000, 5000, 'a') LOOP
+        DBMS_OUTPUT.PUT_LINE(rekord.first_name || ' ' || rekord.last_name || ', Salary: ' || rekord.salary);
+    END LOOP;
+
+    FOR rekord IN zarobki_cursor(5000, 20000, 'u') LOOP
+        DBMS_OUTPUT.PUT_LINE(rekord.first_name || ' ' || rekord.last_name || ', Salary: ' || rekord.salary);
+    END LOOP;
+END;
+/
+
+-- 10. Statystyki menedżerów
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE TABLE STATYSTYKI_MENEDZEROW (manager_id NUMBER, liczba_podwladnych NUMBER, roznica_pensji NUMBER)';
+    FOR menedzer IN (SELECT manager_id FROM employees WHERE manager_id IS NOT NULL GROUP BY manager_id) LOOP
+        INSERT INTO STATYSTYKI_MENEDZEROW(manager_id, liczba_podwladnych, roznica_pensji)
+        VALUES (
+            menedzer.manager_id,
+            (SELECT COUNT(*) FROM employees WHERE manager_id = menedzer.manager_id),
+            (SELECT MAX(salary) - MIN(salary) FROM employees WHERE manager_id = menedzer.manager_id)
+        );
+    END LOOP;
+    DBMS_OUTPUT.PUT_LINE('Statystyki menedżerów zostały zapisane.');
+END;
+/
