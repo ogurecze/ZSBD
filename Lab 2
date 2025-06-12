@@ -1,0 +1,171 @@
+-- I. Usuń wszystkie tabele ze swojej bazy
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS employees, departments, jobs, regions, countries, locations CASCADE;
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- II. Przekopiowanie tabel i danych od użytkownika HR
+CREATE TABLE employees AS SELECT * FROM HR.employees;
+CREATE TABLE departments AS SELECT * FROM HR.departments;
+CREATE TABLE jobs AS SELECT * FROM HR.jobs;
+CREATE TABLE regions AS SELECT * FROM HR.regions;
+CREATE TABLE countries AS SELECT * FROM HR.countries;
+CREATE TABLE locations AS SELECT * FROM HR.locations;
+
+-- Ustawienie kluczy głównych i obcych
+ALTER TABLE employees ADD PRIMARY KEY (employee_id);
+ALTER TABLE departments ADD PRIMARY KEY (department_id);
+ALTER TABLE jobs ADD PRIMARY KEY (job_id);
+ALTER TABLE regions ADD PRIMARY KEY (region_id);
+ALTER TABLE countries ADD PRIMARY KEY (country_id);
+ALTER TABLE locations ADD PRIMARY KEY (location_id);
+
+ALTER TABLE employees ADD FOREIGN KEY (job_id) REFERENCES jobs(job_id);
+ALTER TABLE employees ADD FOREIGN KEY (department_id) REFERENCES departments(department_id);
+ALTER TABLE departments ADD FOREIGN KEY (location_id) REFERENCES locations(location_id);
+ALTER TABLE countries ADD FOREIGN KEY (region_id) REFERENCES regions(region_id);
+ALTER TABLE locations ADD FOREIGN KEY (country_id) REFERENCES countries(country_id);
+
+-- III. Tworzenie perspektyw lub zapytań
+
+-- 1
+SELECT last_name || ', ' || salary AS wynagrodzenie
+FROM employees
+WHERE department_id IN (20, 50) AND salary BETWEEN 2000 AND 7000
+ORDER BY last_name;
+
+-- 2
+SELECT hire_date, last_name, {column_name}
+FROM employees
+WHERE manager_id IS NOT NULL AND EXTRACT(YEAR FROM hire_date) = 2005
+ORDER BY {column_name};
+
+-- 3
+SELECT first_name || ' ' || last_name AS full_name, salary, phone_number
+FROM employees
+WHERE SUBSTRING(last_name, 3, 1) = 'e' AND first_name LIKE '%{substring}%'
+ORDER BY full_name DESC, phone_number ASC;
+
+-- 4
+SELECT first_name, last_name,
+       ROUND(MONTHS_BETWEEN(SYSDATE, hire_date)) AS months_worked,
+       CASE
+           WHEN ROUND(MONTHS_BETWEEN(SYSDATE, hire_date)) < 150 THEN 0.1 * salary
+           WHEN ROUND(MONTHS_BETWEEN(SYSDATE, hire_date)) BETWEEN 150 AND 200 THEN 0.2 * salary
+           ELSE 0.3 * salary
+       END AS wysokość_dodatku
+FROM employees
+ORDER BY months_worked;
+
+-- 5
+SELECT department_id, SUM(salary) AS total_salary, ROUND(AVG(salary), 0) AS avg_salary
+FROM employees
+GROUP BY department_id
+HAVING MIN(salary) > 5000;
+
+-- 6
+SELECT last_name, department_id, department_name, job_id
+FROM employees e
+JOIN departments d ON e.department_id = d.department_id
+WHERE location_id IN (SELECT location_id FROM locations WHERE city = 'Toronto');
+
+-- 7
+SELECT e1.first_name, e1.last_name, e2.first_name AS coworker_first_name, e2.last_name AS coworker_last_name
+FROM employees e1
+JOIN employees e2 ON e1.department_id = e2.department_id AND e1.employee_id != e2.employee_id
+WHERE e1.first_name = 'Jennifer';
+
+-- 8
+SELECT department_name
+FROM departments d
+LEFT JOIN employees e ON d.department_id = e.department_id
+WHERE e.department_id IS NULL;
+
+-- 9
+SELECT first_name, last_name, job_id, department_name, salary,
+       CASE
+           WHEN salary < 5000 THEN 'Low'
+           WHEN salary BETWEEN 5000 AND 10000 THEN 'Medium'
+           ELSE 'High'
+       END AS grade
+FROM employees e
+JOIN departments d ON e.department_id = d.department_id;
+
+-- 10
+SELECT first_name, last_name, salary
+FROM employees
+WHERE salary > (SELECT AVG(salary) FROM employees)
+ORDER BY salary DESC;
+
+-- 11
+SELECT e1.employee_id, e1.first_name, e1.last_name
+FROM employees e1
+WHERE e1.department_id IN (
+    SELECT department_id
+    FROM employees
+    WHERE last_name LIKE '%u%'
+);
+
+-- 12
+SELECT first_name, last_name
+FROM employees
+WHERE MONTHS_BETWEEN(SYSDATE, hire_date) >
+      (SELECT AVG(MONTHS_BETWEEN(SYSDATE, hire_date)) FROM employees);
+
+-- 13
+SELECT department_name, COUNT(*) AS num_employees, ROUND(AVG(salary), 2) AS avg_salary
+FROM employees e
+JOIN departments d ON e.department_id = d.department_id
+GROUP BY department_name
+ORDER BY num_employees DESC;
+
+-- 14
+SELECT first_name, last_name, salary
+FROM employees
+WHERE salary < ALL (
+    SELECT salary
+    FROM employees
+    WHERE department_id = (SELECT department_id FROM departments WHERE department_name = 'IT')
+);
+
+-- 15
+SELECT department_name
+FROM departments d
+JOIN employees e ON d.department_id = e.department_id
+GROUP BY department_name
+HAVING MAX(salary) > (SELECT AVG(salary) FROM employees);
+
+-- 16
+SELECT job_id, AVG(salary) AS avg_salary
+FROM employees
+GROUP BY job_id
+ORDER BY avg_salary DESC
+LIMIT 5;
+
+-- 17
+SELECT r.region_name, COUNT(DISTINCT c.country_id) AS num_countries, COUNT(e.employee_id) AS num_employees
+FROM regions r
+JOIN countries c ON r.region_id = c.region_id
+JOIN locations l ON c.country_id = l.country_id
+JOIN departments d ON l.location_id = d.location_id
+JOIN employees e ON d.department_id = e.department_id
+GROUP BY r.region_name;
+
+-- 18
+SELECT e1.first_name, e1.last_name
+FROM employees e1
+JOIN employees e2 ON e1.manager_id = e2.employee_id
+WHERE e1.salary > e2.salary;
+
+-- 19
+SELECT TO_CHAR(hire_date, 'MM') AS hire_month, COUNT(*) AS num_employees
+FROM employees
+GROUP BY TO_CHAR(hire_date, 'MM')
+ORDER BY hire_month;
+
+-- 20
+SELECT department_name, AVG(salary) AS avg_salary
+FROM employees e
+JOIN departments d ON e.department_id = d.department_id
+GROUP BY department_name
+ORDER BY avg_salary DESC
+LIMIT 3;
