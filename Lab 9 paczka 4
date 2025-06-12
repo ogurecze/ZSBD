@@ -1,0 +1,32 @@
+CREATE OR REPLACE PACKAGE stats_pkg IS
+    FUNCTION avg_salary(p_department_id IN departments.department_id%TYPE) RETURN NUMBER;
+    FUNCTION min_max_salary(p_job_id IN jobs.job_id%TYPE) RETURN VARCHAR2;
+    PROCEDURE generate_report(p_department_id IN departments.department_id%TYPE);
+END stats_pkg;
+/
+
+CREATE OR REPLACE PACKAGE BODY stats_pkg IS
+    FUNCTION avg_salary(p_department_id IN departments.department_id%TYPE) RETURN NUMBER IS
+        v_avg_salary NUMBER;
+    BEGIN
+        SELECT AVG(salary) INTO v_avg_salary FROM employees WHERE department_id = p_department_id;
+        RETURN v_avg_salary;
+    END;
+
+    FUNCTION min_max_salary(p_job_id IN jobs.job_id%TYPE) RETURN VARCHAR2 IS
+        v_min_salary NUMBER;
+        v_max_salary NUMBER;
+    BEGIN
+        SELECT MIN(salary), MAX(salary) INTO v_min_salary, v_max_salary FROM employees WHERE job_id = p_job_id;
+        RETURN 'Min: ' || v_min_salary || ', Max: ' || v_max_salary;
+    END;
+
+    PROCEDURE generate_report(p_department_id IN departments.department_id%TYPE) IS
+        v_report CLOB;
+    BEGIN
+        v_report := 'Department Report: ' || p_department_id || CHR(10) ||
+                    'Average Salary: ' || avg_salary(p_department_id);
+        DBMS_OUTPUT.PUT_LINE(v_report);
+    END;
+END stats_pkg;
+/
