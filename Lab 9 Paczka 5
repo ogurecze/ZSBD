@@ -1,0 +1,20 @@
+CREATE OR REPLACE PACKAGE auto_update_pkg IS
+    PROCEDURE correct_phone_format;
+    PROCEDURE mass_update_salary(p_job_id IN jobs.job_id%TYPE, p_percentage IN NUMBER);
+END auto_update_pkg;
+/
+
+CREATE OR REPLACE PACKAGE BODY auto_update_pkg IS
+    PROCEDURE correct_phone_format IS
+    BEGIN
+        UPDATE employees SET phone_number = REPLACE(phone_number, '-', '') WHERE phone_number LIKE '%-%';
+    END;
+
+    PROCEDURE mass_update_salary(p_job_id IN jobs.job_id%TYPE, p_percentage IN NUMBER) IS
+    BEGIN
+        UPDATE employees
+        SET salary = salary * (1 + p_percentage / 100)
+        WHERE job_id = p_job_id;
+    END;
+END auto_update_pkg;
+/
