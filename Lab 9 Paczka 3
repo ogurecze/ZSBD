@@ -1,0 +1,38 @@
+CREATE OR REPLACE PACKAGE regions_ex_pkg IS
+    EXCEPTION existing_region_name;
+    EXCEPTION region_has_countries;
+    PROCEDURE log_error(p_error_message IN VARCHAR2);
+END regions_ex_pkg;
+/
+
+CREATE OR REPLACE PACKAGE BODY regions_ex_pkg IS
+    PROCEDURE log_error(p_error_message IN VARCHAR2) IS
+    BEGIN
+        INSERT INTO audit_log (error_message, log_time) VALUES (p_error_message, SYSDATE);
+    END;
+
+    PROCEDURE add_region(p_region_name IN regions.region_name%TYPE) IS
+    BEGIN
+        IF EXISTS (SELECT 1 FROM regions WHERE region_name = p_region_name) THEN
+            RAISE existing_region_name;
+        END IF;
+        INSERT INTO regions (region_id, region_name) VALUES (regions_seq.NEXTVAL, p_region_name);
+    EXCEPTION
+        WHEN existing_region_name THEN
+            log_error('Region already exists: ' || p_region_name);
+            RAISE;
+    END;
+
+    PROCEDURE delete_region(p_region_id IN regions.region_id%TYPE) IS
+    BEGIN
+        IF EXISTS (SELECT 1 FROM countries WHERE region_id = p_region_id) THEN
+            RAISE region_has_countries;
+        END IF;
+        DELETE FROM regions WHERE region_id = p_region_id;
+    EXCEPTION
+        WHEN region_has_countries THEN
+            log_error('Region has countries assigned, cannot delete.');
+            RAISE;
+    END;
+END regions_ex_pkg;
+/
